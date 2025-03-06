@@ -4,7 +4,7 @@ type NFT = {
 	id: string;
 	name: string;
 	content: string;
-	encryptedContent: string;
+	encrypted?: unknown;
 	ipfsUrl: string;
 	owner: string;
 	createdAt: number;

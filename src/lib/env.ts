@@ -2,14 +2,14 @@
 
 // Web3 Configuration
 export const PINATA_CONFIG = {
-	PINATA_JWT: process.env.NEXT_PUBLIC_PINATA_JWT || '',
-	PINATA_GATEWAY: process.env.NEXT_PUBLIC_PINATA_GATEWAY || '',
-	PINATA_GATEWAY_KEY: process.env.NEXT_PUBLIC_PINATA_GATEWAY_KEY || '',
+	PINATA_JWT: process.env.PINATA_JWT || '',
+	PINATA_GATEWAY: process.env.PINATA_GATEWAY || '',
+	PINATA_GATEWAY_KEY: process.env.PINATA_GATEWAY_KEY || '',
 };
 
 // Lit Protocol Configuration
 export const LIT_CONFIG = {
-	NETWORK: process.env.NEXT_PUBLIC_LIT_NETWORK || 'serrano', // 'serrano' for testnet, 'habanero' for mainnet
+	NETWORK: process.env.LIT_NETWORK || 'yellowstone', // 'yellowstone' for testnet, 'coreDao' for mainnet
 };
 
 // NFT Contract Configuration

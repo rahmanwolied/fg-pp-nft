@@ -23,15 +23,15 @@ export function Providers({ children }: ProvidersProps) {
   )
 }
 
-function ThemeProvider({ children }: { children: ReactNode }) {
+function ThemeProvider({ children, ...props }: React.ComponentProps<typeof NextThemeProvider>) {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => setMounted(true), [])
 
-  if (!mounted) return <>{children}</>
+  if (!mounted) return <div className="bg-background text-foreground h-screen w-screen" />
 
   return (
-    <NextThemeProvider attribute="class" defaultTheme='dark' enableSystem>
+    <NextThemeProvider {...props} attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       {children}
     </NextThemeProvider>
   )
