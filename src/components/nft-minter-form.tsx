@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 
 import { useLitProtocol } from '@/hooks/use-lit-protocol';
 import { useIPFS } from '@/hooks/use-ipfs';
-import { useStore } from '@/lib/store';
+import { useWalletStore, useNFTStore } from '@/lib/store';
 
 const accessControlConditions = [
 	{
@@ -25,7 +25,7 @@ const accessControlConditions = [
 		parameters: [':userAddress', 'latest'],
 		returnValueTest: {
 			comparator: '>=',
-			value: '1000000000000', // 0.000001 ETH
+			value: '100000', // 0.000001 ETH
 		},
 	},
 ];
@@ -41,7 +41,8 @@ export function NFTMinterForm() {
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const { encryptContent, isEncrypting, setIsEncrypting } = useLitProtocol();
 	const { uploadToIPFS, isUploading, setIsUploading } = useIPFS();
-	const { addNFT, currentAccount } = useStore();
+	const { addNFT } = useNFTStore();
+	const { currentAccount } = useWalletStore();
 
 	const form = useForm<FormValues>({
 		resolver: zodResolver(formSchema),
@@ -86,6 +87,7 @@ export function NFTMinterForm() {
 				ipfsUrl: `https://ipfs.io/ipfs/${IpfsHash}`,
 				owner: currentAccount,
 				createdAt: Date.now(),
+				encrypted,
 			};
 
 			addNFT(newNFT);

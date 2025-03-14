@@ -6,22 +6,30 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 
-import { useStore } from '@/lib/store';
+import { useWalletStore, useNFTStore } from '@/lib/store';
 import { useLitProtocol } from '@/hooks/use-lit-protocol';
-import { Lock } from 'lucide-react';
+import { Lock, Trash } from 'lucide-react';
+
+const accessControlConditions = [
+	{
+		contractAddress: '',
+		standardContractType: '',
+		chain: 'ethereum',
+		method: 'eth_getBalance',
+		parameters: [':userAddress', 'latest'],
+		returnValueTest: {
+			comparator: '>=',
+			value: '10000', // 0.000001 ETH
+		},
+	},
+];
 
 export function NFTList() {
-	const { currentAccount } = useStore();
-	const { isDecrypting } = useLitProtocol();
+	const { nfts, removeNFT } = useNFTStore();
+	const { currentAccount } = useWalletStore();
+	const { isDecrypting, decryptContent, getSessionSigs } = useLitProtocol();
 	const [decryptingId, setDecryptingId] = useState<string | null>(null);
 	const [decryptedContents, setDecryptedContents] = useState<Record<string, string>>({});
-
-	// Demo NFTs
-	const demoNFTs = [
-		{ id: '1', name: 'Demo NFT 1', createdAt: Date.now(), content: 'This is the decrypted content for Demo NFT 1' },
-		{ id: '2', name: 'Demo NFT 2', createdAt: Date.now() - 86400000, content: 'This is the decrypted content for Demo NFT 2' },
-		{ id: '3', name: 'Demo NFT 3', createdAt: Date.now() - 172800000, content: 'This is the decrypted content for Demo NFT 3' },
-	];
 
 	const handleDecrypt = async (nftId: string) => {
 		if (!currentAccount) {
@@ -33,12 +41,16 @@ export function NFTList() {
 
 		try {
 			setDecryptingId(nftId);
-			await new Promise((resolve) => setTimeout(resolve, 1500));
-			const nft = demoNFTs.find((n) => n.id === nftId);
+			const nft = nfts.find((n) => n.id === nftId);
 			if (nft) {
+				const sessionSigs = await getSessionSigs(accessControlConditions, nft.encrypted!.dataToEncryptHash);
+
+				if (!sessionSigs) throw new Error('Failed to generate session signature');
+
+				const decrypted = (await decryptContent(nft.encrypted!, sessionSigs)) as string;
 				setDecryptedContents((prev) => ({
 					...prev,
-					[nftId]: nft.content,
+					[nftId]: decrypted,
 				}));
 				toast.success('Content decrypted successfully');
 			}
@@ -75,11 +87,14 @@ export function NFTList() {
 			</CardHeader>
 			<CardContent>
 				<div className="space-y-4">
-					{demoNFTs.map((nft) => (
+					{nfts.map((nft) => (
 						<Card key={nft.id} className="overflow-hidden">
-							<CardHeader className="pb-2">
+							<CardHeader className="pb-2 relative">
 								<CardTitle className="text-lg">{nft.name}</CardTitle>
 								<CardDescription className="text-xs">Created: {new Date(nft.createdAt).toLocaleString()}</CardDescription>
+								<Button onClick={() => removeNFT(nft.id)} className="absolute top-2 right-2">
+									<Trash />
+								</Button>
 							</CardHeader>
 							<CardContent>
 								{decryptedContents[nft.id] ? (
@@ -87,7 +102,15 @@ export function NFTList() {
 										<p className="whitespace-pre-wrap text-sm">{decryptedContents[nft.id]}</p>
 									</div>
 								) : (
-									<p className="text-sm text-muted-foreground">Content is encrypted. Click the button below to decrypt.</p>
+									<div>
+										<div className="flex items-center justify-center">
+											<p className="text-sm text-muted-foreground">Content is encrypted. Click the button below to decrypt.</p>
+											<Lock className="size-40 text-muted-foreground/80" />
+										</div>
+										<pre className="text-xs overflow-x-auto whitespace-pre-wrap break-words bg-accent rounded-md p-3">
+											<code>{JSON.stringify(nft, null, 2)}</code>
+										</pre>
+									</div>
 								)}
 							</CardContent>
 							<CardFooter>

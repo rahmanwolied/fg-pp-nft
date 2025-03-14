@@ -1,7 +1,7 @@
 'use client';
 
 import { useAccount, useChains, useConnect, useDisconnect } from 'wagmi';
-import { useStore } from '@/lib/store';
+import { useWalletStore } from '@/lib/store';
 import { useEffect } from 'react';
 
 export function useWallet() {
@@ -9,7 +9,7 @@ export function useWallet() {
 	const chains = useChains();
 	const { connect, connectors, isPending } = useConnect();
 	const { disconnect } = useDisconnect();
-	const { setWalletConnected, setCurrentAccount } = useStore();
+	const { setWalletConnected, setCurrentAccount } = useWalletStore();
 
 	useEffect(() => {
 		setWalletConnected(isConnected);
@@ -24,6 +24,7 @@ export function useWallet() {
 			}
 		} catch (error) {
 			console.error('Error connecting wallet:', error);
+			throw error;
 		}
 	};
 

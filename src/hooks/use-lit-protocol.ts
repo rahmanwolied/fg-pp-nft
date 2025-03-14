@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { LitNodeClient } from '@lit-protocol/lit-node-client';
-import { encryptContent as _encryptContent } from '@/lib/lit';
+import { encryptContent as _encryptContent, generateSessionSignature, decryptContent as _decryptContent } from '@/lib/lit';
 import { initLitClient } from '@/lib/lit';
-import { AccessControlConditions } from '@lit-protocol/types';
+import { AccessControlConditions, EncryptToJsonPayload, SessionSigsMap } from '@lit-protocol/types';
 
 export function useLitProtocol() {
 	const [isInitialized, setIsInitialized] = useState(false);
@@ -47,8 +47,40 @@ export function useLitProtocol() {
 		}
 	};
 
+	const getSessionSigs = async (accessControlConditions: AccessControlConditions, dataToEncryptHash: string) => {
+		if (!client) {
+			throw new Error('Lit client not initialized');
+		}
+		const sessionSigs = await generateSessionSignature(accessControlConditions, dataToEncryptHash, client);
+
+		return sessionSigs;
+	};
+
+	const decryptContent = async (encrypted: EncryptToJsonPayload, sessionSigs: SessionSigsMap) => {
+		setIsDecrypting(true);
+		setError(null);
+
+		try {
+			if (!client) {
+				throw new Error('Lit client not initialized');
+			}
+
+			const decrypted = await _decryptContent(encrypted, sessionSigs, client);
+			return decrypted;
+		} catch (err) {
+			const errorMessage = err instanceof Error ? err.message : 'Unknown error during decryption';
+			setError(errorMessage);
+			setIsDecrypting(false);
+			throw err;
+		} finally {
+			setIsDecrypting(false);
+		}
+	};
+
 	return {
 		encryptContent,
+		decryptContent,
+		getSessionSigs,
 		isEncrypting,
 		isDecrypting,
 		isInitialized,

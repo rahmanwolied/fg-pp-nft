@@ -1,11 +1,14 @@
 'use client';
 
 import { encryptToJson, decryptFromJson } from '@lit-protocol/encryption';
-import { AccessControlConditions } from '@lit-protocol/types';
+import { AccessControlConditions, EncryptToJsonPayload, SessionSigsMap } from '@lit-protocol/types';
 import { LitNodeClient } from '@lit-protocol/lit-node-client';
 import { LitContracts } from '@lit-protocol/contracts-sdk';
 import { LIT_NETWORK } from '@lit-protocol/constants';
 import { LIT_CONFIG } from './env';
+import { ethers } from 'ethers';
+import { LIT_ABILITY } from '@lit-protocol/constants';
+import { createSiweMessage, generateAuthSig, LitAccessControlConditionResource } from '@lit-protocol/auth-helpers';
 
 export type ACC = AccessControlConditions;
 
@@ -23,6 +26,25 @@ export const initLitClient = async () => {
 	}
 };
 
+export const initContractClient = async () => {
+	try {
+		const contractClient = new LitContracts({
+			network: LIT_NETWORK.DatilDev,
+		});
+		await contractClient.connect();
+
+		const { capacityTokenIdStr } = await contractClient.mintCapacityCreditsNFT({
+			requestsPerKilosecond: 80,
+			daysUntilUTCMidnightExpiration: 2,
+		});
+
+		return { contractClient, capacityTokenIdStr };
+	} catch (err) {
+		const errorMessage = err instanceof Error ? err.message : 'Failed to initialize contract client';
+		throw new Error(errorMessage);
+	}
+};
+
 export const encryptContent = async (content: string, accessControlConditions: AccessControlConditions, client?: LitNodeClient) => {
 	try {
 		const litNodeClient = client || (await initLitClient());
@@ -34,65 +56,77 @@ export const encryptContent = async (content: string, accessControlConditions: A
 			chain: LIT_CONFIG.NETWORK,
 		});
 
-		return await JSON.parse(encrypted);
+		return (await JSON.parse(encrypted)) as EncryptToJsonPayload;
 	} catch (err) {
 		const errorMessage = err instanceof Error ? err.message : 'Unknown error during encryption';
 		throw new Error(errorMessage);
 	}
 };
 
-// // Decrypt content using Lit Protocol
-// const decryptContent = async (encryptedContent: string, encryptedSymmetricKey: string, accessControlConditions: any) => {
-// 	setIsDecrypting(true);
-// 	setError(null);
+export const deletageUse = async (litNodeClient: LitNodeClient, capacityTokenIdStr: string, walletAddress: string) => {
+	const provider = new ethers.BrowserProvider(window.ethereum);
+	const wallet = await provider.getSigner();
 
-// 	try {
-// 		const litClient = await getLitClient();
+	const { capacityDelegationAuthSig } = await litNodeClient.createCapacityDelegationAuthSig({
+		uses: '1',
+		capacityTokenId: capacityTokenIdStr,
+		delegateeAddresses: [walletAddress],
+		dAppOwnerWallet: wallet,
+	});
 
-// 		// Get auth signature
-// 		const authSig = await LitJsSdk.checkAndSignAuthMessage({ chain: 'ethereum' });
+	return capacityDelegationAuthSig;
+};
 
-// 		// Convert the encrypted symmetric key back to Uint8Array
-// 		const encryptedSymmetricKeyUint8Array = LitJsSdk.stringToUint8Array(encryptedSymmetricKey, 'base16');
+export const generateSessionSignature = async (
+	accessControlConditions: AccessControlConditions,
+	dataToEncryptHash: string,
+	client?: LitNodeClient
+) => {
+	const litNodeClient = client || (await initLitClient());
 
-// 		// Get the decryption key from the Lit network
-// 		const symmetricKey = await litClient.getEncryptionKey({
-// 			accessControlConditions,
-// 			toDecrypt: encryptedSymmetricKeyUint8Array,
-// 			chain: 'ethereum',
-// 			authSig,
-// 		});
+	const provider = new ethers.BrowserProvider(window.ethereum);
+	const wallet = await provider.getSigner();
 
-// 		// Convert the encrypted content from base64 to blob
-// 		const encryptedStringBlob = await LitJsSdk.base64StringToBlob(encryptedContent);
+	const sessionSigs = await litNodeClient.getSessionSigs({
+		chain: LIT_CONFIG.NETWORK,
+		expiration: new Date(Date.now() + 1000 * 60 * 10).toISOString(), // 10 minutes
+		resourceAbilityRequests: [
+			{
+				resource: new LitAccessControlConditionResource(
+					await LitAccessControlConditionResource.generateResourceString(accessControlConditions, dataToEncryptHash)
+				),
+				ability: LIT_ABILITY.AccessControlConditionDecryption,
+			},
+		],
+		authNeededCallback: async ({ uri, expiration, resourceAbilityRequests }) => {
+			const toSign = await createSiweMessage({
+				uri,
+				expiration,
+				resources: resourceAbilityRequests,
+				walletAddress: wallet.address,
+				nonce: await litNodeClient.getLatestBlockhash(),
+				litNodeClient,
+				statement: 'I accept the terms and conditions of this NFT',
+			});
 
-// 		// Decrypt the content
-// 		const decryptedString = await LitJsSdk.decryptString(encryptedStringBlob, symmetricKey);
+			return await generateAuthSig({
+				signer: wallet,
+				toSign,
+			});
+		},
+	});
 
-// 		setIsDecrypting(false);
-// 		return decryptedString;
-// 	} catch (err) {
-// 		const errorMessage = err instanceof Error ? err.message : 'Unknown error during decryption';
-// 		setError(errorMessage);
-// 		setIsDecrypting(false);
-// 		throw err;
-// 	}
-// };
+	return sessionSigs;
+};
 
-// // Create standard access control conditions for NFT ownership
-// // See: https://developer.litprotocol.com/concepts/access-control-concept
-// const createNftOwnershipAccessControlConditions = (contractAddress: string, chainId: number = 1) => {
-// 	return [
-// 		{
-// 			contractAddress,
-// 			standardContractType: 'ERC721',
-// 			chain: 'ethereum',
-// 			method: 'balanceOf',
-// 			parameters: [':userAddress'],
-// 			returnValueTest: {
-// 				comparator: '>',
-// 				value: '0',
-// 			},
-// 		},
-// 	];
-// };
+export const decryptContent = async (encrypted: EncryptToJsonPayload, sessionSigs: SessionSigsMap, client?: LitNodeClient) => {
+	const litNodeClient = client || (await initLitClient());
+
+	const decryptionResult = await decryptFromJson({
+		litNodeClient,
+		parsedJsonData: encrypted,
+		sessionSigs,
+	});
+
+	return decryptionResult;
+};

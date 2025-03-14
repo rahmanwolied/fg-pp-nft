@@ -9,7 +9,7 @@ export const PINATA_CONFIG = {
 
 // Lit Protocol Configuration
 export const LIT_CONFIG = {
-	NETWORK: process.env.LIT_NETWORK || 'yellowstone', // 'yellowstone' for testnet, 'coreDao' for mainnet
+	NETWORK: process.env.LIT_NETWORK || 'ethereum', // 'yellowstone' for testnet, 'coreDao' for mainnet
 };
 
 // NFT Contract Configuration
