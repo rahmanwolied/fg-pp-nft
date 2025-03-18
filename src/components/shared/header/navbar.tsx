@@ -14,7 +14,7 @@ export default function Navbar() {
 						d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
 					/>
 				</svg>
-				<h1 className="text-lg font-bold">Privacy Protected NFT</h1>
+				<h1 className="text-lg font-bold">Data NFT</h1>
 			</div>
 			<div className="flex items-center space-x-4">
 				<WalletConnect />
