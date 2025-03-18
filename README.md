@@ -1,109 +1,119 @@
-# Text NFT Minter
+# Encrypted NFT with Lit Protocol Access Control
 
-A simple prototype application for minting encrypted text NFTs using Lit Protocol and storing them on IPFS.
+This project demonstrates how to create encrypted NFTs using AES-256-GCM for content encryption and Lit Protocol for access control.
 
-## Project Overview
+## Architecture
 
-This application allows users to:
+The implementation follows a secure "envelope encryption" pattern:
 
-1. Connect their Ethereum wallet (using viem/wagmi)
-2. Create text-based NFTs with encrypted content
-3. Store the encrypted content on IPFS
-4. View and decrypt their NFTs
+1. **Content Encryption**: NFT content is encrypted using AES-256-GCM with a randomly generated key
+2. **Key Protection**: The encryption key is then encrypted using Lit Protocol's access control system
+3. **Access Control**: Only users with approval to spend the specified NFT token can decrypt the key
 
-## Technology Stack
+This approach provides several benefits:
+- Separation of content encryption from access control
+- Efficient encryption of large content
+- Granular access control through Lit Protocol's condition system
+- NFT-based access control for decentralized content permissions
 
-- **Framework**: Next.js 15 with TypeScript and ESLint
-- **Web3 Integration**: viem and wagmi for blockchain interactions
-- **State Management**: zustand for global state and React Query for data fetching/caching
-- **UI Components**: shadcn components for a modern, responsive design
-- **Encryption**: Lit Protocol for content encryption and access control
-- **Storage**: IPFS via web3.storage for storing encrypted content
+## Implementation Details
+
+### Access Control Mechanism
+
+The system uses ERC721's approval mechanism to control access to encrypted content:
+
+1. **Token Approval Check**: The access control condition verifies if a wallet has been approved to spend a specific NFT token
+2. **Flexible Permissions**: Can be configured to check for approval for:
+   - A specific approved address (targeted permission)
+   - Any non-zero address (general permission)
+3. **Standard Compliance**: Works with any ERC721-compliant NFT contract
+
+### Encryption Flow
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  NFT Content │────▶│  AES-256-GCM │────▶│  Encrypted  │
+└─────────────┘     │  Encryption  │     │   Content   │
+                    └─────────────┘     └─────────────┘
+                          │
+                          │ Generates
+                          ▼
+                    ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+                    │  Secret Key  │────▶│ Lit Protocol │────▶│  Encrypted  │
+                    └─────────────┘     │  Encryption  │     │     Key     │
+                                        └─────────────┘     └─────────────┘
+```
+
+### Decryption Flow
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  NFT Token   │────▶│ Lit Protocol │────▶│ Decrypted   │
+│  Approval    │     │  Decryption  │     │    Key      │
+└─────────────┘     └─────────────┘     └─────────────┘
+                                              │
+                                              │
+┌─────────────┐     ┌─────────────┐          │
+│  Encrypted  │────▶│  AES-256-GCM │◀─────────┘
+│   Content   │     │  Decryption  │
+└─────────────┘     └─────────────┘
+                          │
+                          ▼
+                    ┌─────────────┐
+                    │  Decrypted  │
+                    │   Content   │
+                    └─────────────┘
+```
+
+## Security Considerations
+
+- **Key Management**: The AES key is never exposed directly to users
+- **Authenticated Encryption**: AES-GCM provides both confidentiality and integrity
+- **Access Control**: Lit Protocol ensures only authorized users can decrypt the content
+- **On-chain Storage**: Only encrypted data is stored on-chain, protecting privacy
+- **NFT-based Access**: Leverages existing NFT approval mechanisms for permission management
+
+## Technologies Used
+
+- **AES-256-GCM**: Industry-standard symmetric encryption
+- **Lit Protocol**: Decentralized access control network
+- **Next.js**: React framework for the frontend
+- **TypeScript**: Type-safe JavaScript
+- **ERC721**: NFT standard for access control
 
 ## Getting Started
 
-### Prerequisites
+1. Clone this repository
+2. Install dependencies: `npm install`
+3. Run the development server: `npm run dev`
+4. Connect your wallet and try encrypting/decrypting NFT content
 
-- Node.js 18+ and npm/yarn/pnpm
-- An Ethereum wallet (MetaMask recommended)
-- API keys for the following services:
-  - Web3.Storage (for IPFS storage)
-  - WalletConnect Project ID (optional, for WalletConnect integration)
+## Usage Example
 
-### Environment Setup
+```typescript
+// Create access control conditions for NFT approval
+const accessControlConditions = createNFTApprovalAccessControl(
+  "0x123...abc", // NFT contract address
+  "42",          // Token ID
+  "0x456...def"  // Optional: specific approved address
+);
 
-Create a `.env.local` file in the root directory with the following variables:
+// Encrypt NFT content
+const encryptedNFT = await encryptNFTContent(
+  "My secret NFT content",
+  { name: "Secret NFT", description: "This NFT is encrypted" },
+  accessControlConditions,
+  litNodeClient
+);
 
+// Store the encrypted NFT data on-chain or in storage
+
+// Later, decrypt the content (only works if user's wallet is approved for the token)
+const decryptedContent = await decryptNFTContent(
+  encryptedNFT,
+  litNodeClient
+);
 ```
-NEXT_PUBLIC_WEB3_STORAGE_API_KEY=your_web3_storage_api_key
-NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
-NEXT_PUBLIC_NFT_CONTRACT_ADDRESS=your_nft_contract_address
-NEXT_PUBLIC_CHAIN_ID=11155111  # Sepolia testnet by default
-NEXT_PUBLIC_LIT_NETWORK=serrano  # 'serrano' for testnet, 'habanero' for mainnet
-```
-
-### Installation
-
-```bash
-# Install dependencies
-npm install
-# or
-yarn install
-# or
-pnpm install
-
-# Run the development server
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the application.
-
-## How It Works
-
-### Encryption Process
-
-1. **Content Creation**: User enters text content to be minted as an NFT
-2. **Encryption**: The content is encrypted using Lit Protocol
-   - See [Lit Protocol encryption documentation](https://developer.litprotocol.com/concepts/access-control-concept)
-3. **Access Control**: Access control conditions are set based on NFT ownership
-4. **IPFS Storage**: The encrypted content is stored on IPFS via web3.storage
-5. **NFT Minting**: In a production application, an NFT would be minted with metadata pointing to the IPFS content
-
-### Decryption Process
-
-1. **Authentication**: User connects their wallet
-2. **Access Verification**: Lit Protocol verifies the user meets the access control conditions
-3. **Key Retrieval**: If conditions are met, the decryption key is retrieved
-4. **Content Decryption**: The encrypted content is decrypted and displayed to the user
-
-## Project Structure
-
-- `/src/app`: Next.js app router pages
-- `/src/components`: UI components including NFT minter form and NFT list
-- `/src/hooks`: Custom hooks for wallet connection, IPFS storage, and Lit Protocol
-- `/src/lib`: Utility functions, store, and configuration
-
-## Resources
-
-- [Lit Protocol Documentation](https://developer.litprotocol.com/what-is-lit)
-- [Web3.Storage Documentation](https://web3.storage/docs/)
-- [viem Documentation](https://viem.sh/)
-- [wagmi Documentation](https://wagmi.sh/)
-- [Next.js Documentation](https://nextjs.org/docs)
-- [shadcn/ui Documentation](https://ui.shadcn.com/)
-
-## Limitations
-
-This is a prototype application with the following limitations:
-
-- No actual NFT minting (would require a deployed smart contract)
-- Simplified access control conditions
-- Local state management (no persistence between sessions)
-- Basic error handling
 
 ## License
 
