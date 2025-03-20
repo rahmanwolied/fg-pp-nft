@@ -5,8 +5,11 @@ import {
   custom,
   getContract,
   http,
+  parseEther,
+  zeroAddress,
 } from "viem";
 import { sepolia } from "viem/chains";
+import { FAME_ADDRESS } from "./adresses";
 import { artifacts } from "./artifacts";
 
 const walletClient = createWalletClient({
@@ -29,7 +32,13 @@ export const deployContract = async (args: NFTContractConstructorArgs) => {
     abi: artifacts.abi,
     account,
     bytecode: artifacts.bytecode as `0x${string}`,
-    args: [args.name, args.symbol],
+    args: [
+      args.name,
+      args.symbol,
+      args.baseURI,
+      args.defaultRoyaltyFee,
+      FAME_ADDRESS,
+    ],
   });
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
@@ -46,9 +55,13 @@ export const mintNft = async (args: MintNftArgs) => {
   });
 
   const { result: tokenId, request: mintRequest } =
-    await contractInstance.simulate.mintNFT([account, args.tokenURI], {
-      account,
-    });
+    await contractInstance.simulate.mintDigitalNft(
+      [parseEther("0.0001"), args.tokenURI, BigInt(500), zeroAddress],
+      {
+        account,
+        value: parseEther("0.00001"),
+      }
+    );
   const hash = await walletClient.writeContract(mintRequest);
   await publicClient.waitForTransactionReceipt({ hash });
 
