@@ -7,15 +7,22 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 type NFT = {
   id: string;
+  name: string;
+  description: string;
+  contentType: "text" | "image";
+  metadataHash: string;
+  price: number;
+  royalty: number;
+  likes: number;
+  owner: string;
+  creator: string;
+  isVerified: boolean;
+  createdAt: number;
+  image?: string;
   encryptedKeys: EncryptToJsonPayload;
   encryptedContent: string;
-  description: string;
-  name: string;
-  contentType: "text" | "image";
-  createdBy: string;
-  createdAt: number;
+  encrypted: boolean;
   accessControlConditions: AccessControlConditions;
-  metadataIpfsHash: string;
 };
 
 type NFTStoreState = {

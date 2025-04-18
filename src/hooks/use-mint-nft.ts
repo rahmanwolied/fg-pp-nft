@@ -12,8 +12,8 @@ import {
 import { generateSessionSignature } from "@/lib/lit";
 import { compress, decompress } from "@/lib/pako";
 import {
-  nftMinterFormSchema,
-  type NFTMinterFormValues,
+  createNFTSchema,
+  type CreateNFTSchema,
 } from "@/lib/schemas/nft-minter-schema";
 import { useNFTStore, useWalletStore } from "@/lib/store";
 import { deployAndMintNFT } from "@/lib/viem/deploy";
@@ -33,7 +33,7 @@ export function useMintNFT() {
   const [decryptedContent, setDecryptedContent] =
     useState<DecryptedContent | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string>();
 
   const { nfts } = useNFTStore();
   const { isDecrypting, decryptContent, getSessionSigs } = useLitProtocol();
@@ -47,12 +47,14 @@ export function useMintNFT() {
   const { uploadToIPFS, isUploading, setIsUploading, fetchFromIPFS } =
     useIPFS();
 
-  const form = useForm<NFTMinterFormValues>({
-    resolver: zodResolver(nftMinterFormSchema),
+  const form = useForm<CreateNFTSchema>({
+    resolver: zodResolver(createNFTSchema),
     defaultValues: {
       name: "",
-      contentType: "text",
-      content: "",
+      description: "",
+      file: undefined,
+      price: 0.1,
+      royalty: 5,
     },
   });
 
@@ -73,9 +75,9 @@ export function useMintNFT() {
       let encryptedContent: EncryptedData;
 
       toast.info("Encrypting content on your browser...");
-      if (values.contentType === "image" && values.content instanceof File) {
+      if (values.file instanceof File) {
         // Encrypt the image file
-        encryptedContent = await encryptFileInBrowser(values.content);
+        encryptedContent = await encryptFileInBrowser(values.file);
 
         encryptionKeys = JSON.stringify({
           authTag: encryptedContent.authTag,
@@ -84,7 +86,7 @@ export function useMintNFT() {
           key: encryptedContent.key,
         });
       } else {
-        encryptedContent = encryptText(values.content as string);
+        encryptedContent = encryptText(values.description);
 
         encryptionKeys = JSON.stringify({
           authTag: encryptedContent.authTag,
@@ -108,8 +110,6 @@ export function useMintNFT() {
         defaultRoyaltyFee: BigInt(0),
         fameAddress: currentAccount as `0x${string}`,
       });
-
-      console.log("tokenId", tokenId);
 
       const accessControlConditions: AccessControlConditions = [
         {
@@ -149,9 +149,9 @@ export function useMintNFT() {
         id: crypto.randomUUID(),
         encryptedKeys,
         encryptedContent: encryptedContentIpfsHash,
-        description: `Encrypted ${values.contentType} NFT`,
+        description: `Encrypted NFT`,
         name: values.name,
-        contentType: values.contentType,
+        contentType: "image" as const,
         accessControlConditions,
         createdBy: currentAccount,
         createdAt: Date.now(),
@@ -165,7 +165,15 @@ export function useMintNFT() {
 
       addNFT({
         ...metadata,
-        metadataIpfsHash,
+        metadataHash: metadataIpfsHash,
+        encrypted: true,
+        price: values.price,
+        royalty: values.royalty,
+        likes: 0,
+        owner: currentAccount,
+        creator: currentAccount,
+        isVerified: false,
+        image: imageUrl,
       });
 
       toast.success("NFT created successfully", {

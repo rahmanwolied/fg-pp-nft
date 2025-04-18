@@ -36,7 +36,7 @@ export function NFTMinterForm() {
           <form onSubmit={mintNFT} className="space-y-6">
             <NFTMinterFields form={form} />
 
-            <Button type="submit" className="w-full" disabled={isProcessing}>
+            <Button type="submit" className="" disabled={isProcessing}>
               {isProcessing
                 ? isEncrypting
                   ? "Encrypting..."
